@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import osmnx as ox
 import networkx as nx
+from pyproj import Transformer
 from shapely.geometry import LineString, MultiPoint, mapping
 import uvicorn
 import warnings
