@@ -2,19 +2,20 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import osmnx as ox
 import networkx as nx
-from pyproj import Transformer
 from shapely.geometry import LineString, MultiPoint, mapping
 import uvicorn
 import warnings
+import pickle
 
 warnings.filterwarnings("ignore")
 
 app = FastAPI(title="Routing Środowiskowy API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-print("1. Ładowanie topologii miasta do pamięci RAM...")
-graph_path = '../data/processed/Krakow_Graph_lite.graphml'
-G = ox.load_graphml(graph_path)
+print("1. Ładowanie binarnej topologii miasta do pamięci RAM...")
+graph_path = '../data/processed/Krakow_Graph.pkl'
+with open(graph_path, 'rb') as f:
+    G = pickle.load(f)
 
 print("2. Aplikowanie wykładniczych wag środowiskowych...")
 for u, v, key, data in G.edges(keys=True, data=True):
