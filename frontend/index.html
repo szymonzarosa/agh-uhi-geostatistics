@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebGIS: Ekonometria UHI</title>
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-minimap/3.6.1/Control.MiniMap.min.css" />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text">Przetwarzanie macierzy przestrzennej...</div>
+  </div>
+
+  <div id="sidebar">
+    <h1>Ekonometria Przestrzenna UHI</h1>
+    
+    <!-- ZARZĄDZANIE WARSTWAMI -->
+    <div class="section">
+      <h2 title="Podstawowe warstwy analityczne i referencyjne mapy">Konfiguracja Mapy</h2>
+      <div style="margin-bottom:12px;">
+        <label style="font-size: 0.8rem; color: #aaa;">Warstwa Bazowa:</label>
+        <select id="basemap-select" class="custom-select" style="width: 100%; margin-top: 5px;">
+          <option value="dark">Wizualizacja Analityczna (Ciemna)</option>
+          <option value="light">Wizualizacja Klasyczna (Jasna)</option>
+          <option value="sat">Ortofotomapa (Satelitarna)</option>
+        </select>
+      </div>
+
+      <div class="layer-toggle-row">
+        <span>Wycena Ekonometryczna (H3)</span>
+        <label class="switch"><input type="checkbox" id="toggle-hex" checked><span class="slider"></span></label>
+      </div>
+      <div class="layer-toggle-row">
+        <span>Model Obciążenia Sieci (Graf)</span>
+        <label class="switch"><input type="checkbox" id="toggle-graph"><span class="slider"></span></label>
+      </div>
+      <div class="layer-toggle-row">
+        <span>Strefy Zieleni Miejskiej (POI)</span>
+        <label class="switch"><input type="checkbox" id="toggle-parks" checked><span class="slider"></span></label>
+      </div>
+      <div class="layer-toggle-row">
+        <span>Raster Termiczny (LST)</span>
+        <label class="switch"><input type="checkbox" id="toggle-raster"><span class="slider"></span></label>
+      </div>
+    </div>
+
+    <!-- GWR -->
+    <div class="section" id="section-gwr">
+      <div class="section-header">
+        <h2 style="margin:0;">Model GWR</h2>
+        <select id="gwr-variable" class="custom-select" style="max-width: 160px;">
+          <option value="coef">Wpływ Środowiska</option>
+          <option value="price">Średnia Cena Ofertowa</option>
+          <option value="r2">Dopasowanie (Lokalne R²)</option>
+        </select>
+      </div>
+      
+      <div class="metrics-row">
+        <div class="metric highlight-gold">
+          <div class="metric-title">Średnia Cena Obszaru</div>
+          <div class="metric-value" id="bbox-avg-price">---</div>
+        </div>
+        <div class="metric highlight-green">
+          <div class="metric-title">Średni Wpływ UHI</div>
+          <div class="metric-value" id="bbox-avg-env">---</div>
+        </div>
+      </div>
+
+      <div class="slider-container">
+        <label for="hex-opacity">Poziom przezroczystości siatki H3:</label>
+        <input type="range" id="hex-opacity" min="0" max="1" step="0.05" value="0.75">
+      </div>
+      <div id="legend-container" class="legend-container"></div>
+      
+      <div id="scatter-container" class="scatter-container">
+        <canvas id="hexScatterChart"></canvas>
+      </div>
+    </div>
+
+    <!-- TOPOLOGIA -->
+    <div class="section">
+      <h2>Moduł Analiz Przestrzennych</h2>
+      
+      <div class="search-container">
+        <input type="text" id="geocoder-input" placeholder="Wyszukaj lokalizację (Kraków)..." autocomplete="off">
+        <ul id="geocoder-suggestions"></ul>
+      </div>
+
+      <div class="transport-container">
+        <label>Środek transportu:</label>
+        <select id="transport-mode" class="custom-select">
+          <option value="walk">Pieszy (5 km/h)</option>
+          <option value="bike">Rowerowy (15 km/h)</option>
+        </select>
+      </div>
+
+      <div class="mode-buttons">
+        <button id="mode-explore" class="btn active-explore" title="Zamknij narzędzia analizy i przeglądaj mapę">Eksploracja</button>
+        <button id="mode-route" class="btn" title="Wyznacz optymalną środowiskowo trasę">Trasy</button>
+        <button id="mode-iso" class="btn" title="Oblicz obszar dostępny w 15 minut">Izochrony</button>
+        <button id="mode-sim" class="btn" title="Symulator wartości rynkowej (GWR)">Symulator wyceny</button>
+      </div>
+
+      <!-- KREATOR TRAS -->
+      <div id="panel-route" style="display: none; flex-direction: column; gap: 8px; margin-bottom: 15px; background: #151515; padding: 12px; border: 1px solid #333; border-radius: 6px;">
+        
+        <div class="route-control-group">
+          <button id="btn-target-start" class="btn route-main-btn" style="background: var(--agh-green); border-color: #004c38;">Wskaż Start</button>
+          <button id="btn-lock-start" class="btn icon-btn" title="Zablokuj zmianę startu">🔓</button>
+          <button id="btn-clear-start" class="btn icon-btn" style="border-color: var(--agh-red);" title="Usuń start">✖</button>
+        </div>
+        
+        <div id="route-points-list" style="display: flex; flex-direction: column; gap: 4px; margin: 4px 0;"></div>
+        
+        <button id="btn-add-wp" class="btn route-main-btn" style="background: #222; border: 1px dashed #555; color: #aaa;">+ Wskaż Punkt Pośredni</button>
+        
+        <div class="route-control-group" style="margin-top: 4px;">
+          <button id="btn-target-end" class="btn route-main-btn" style="background: #333; border-color: #444;">Wskaż Koniec</button>
+          <button id="btn-lock-end" class="btn icon-btn" title="Zablokuj zmianę celu">🔓</button>
+          <button id="btn-clear-end" class="btn icon-btn" style="border-color: var(--agh-red);" title="Usuń cel">✖</button>
+        </div>
+        
+        <button id="btn-clear-route" class="btn" style="background: transparent; color: var(--agh-red); border: 1px solid var(--agh-red); margin-top: 8px;">Resetuj Analizę</button>
+      </div>
+      
+      <div class="share-container">
+        <input type="text" id="share-url" readonly placeholder="Link sesji wygeneruje się tutaj...">
+        <button id="copy-url-btn" class="btn copy-btn">Kopiuj Sesję</button>
+      </div>
+
+      <!-- DASHBOARD WYNIKÓW -->
+      <div id="dashboard" class="dashboard">
+        <div class="metric highlight-blue">
+          <div class="metric-title">Trajektoria Optymalna Czasowo <span id="val-time-phys" class="time-subtext"></span></div>
+          <div class="metric-value"><span id="val-dist-phys"></span> <span id="val-stress-phys" class="stress-alert"></span></div>
+        </div>
+        <div class="metric highlight-green">
+          <div class="metric-title">Trajektoria Optymalna Środowiskowo <span id="val-time-env" class="time-subtext"></span></div>
+          <div class="metric-value"><span id="val-dist-env"></span> <span id="val-stress-env" class="stress-alert"></span></div>
+        </div>
+        <div id="val-reduction" class="reduction"></div>
+        <button id="export-geojson-btn" class="btn export-btn">Pobierz Wektor (GeoJSON)</button>
+        <div class="chart-container">
+          <canvas id="stressChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div id="resizer"></div>
+  
+  <div id="map" class="dark-map">
+    <div id="locate-btn" class="map-control-btn" title="Aktywuj geolokalizację urządzenia">
+      <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+    </div>
+    <div id="presentation-btn" class="map-control-btn" title="Aktywuj widok pełnoekranowy">
+      <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+    </div>
+  </div>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-minimap/3.6.1/Control.MiniMap.min.js"></script>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
