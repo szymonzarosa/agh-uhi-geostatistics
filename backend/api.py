@@ -13,7 +13,7 @@ app = FastAPI(title="Routing Środowiskowy API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 print("1. Ładowanie topologii miasta do pamięci RAM...")
-graph_path = '../data/processed/Krakow_Graph.graphml'
+graph_path = '../data/processed/Krakow_Graph_lite.graphml'
 G = ox.load_graphml(graph_path)
 
 print("2. Aplikowanie wykładniczych wag środowiskowych...")
