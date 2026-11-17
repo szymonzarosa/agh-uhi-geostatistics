@@ -62,7 +62,7 @@ const imageBounds = [[50.045, 19.890], [50.090, 19.960]];
 const rasterLayer = L.imageOverlay('/impedance_raster.png', imageBounds, { className: 'raster-layer' });
 
 let vectorGridLayer = null;
-fetch('/streets_stress.geojson').then(res => res.json()).then(data => {
+fetch('./streets_stress.geojson').then(res => res.json()).then(data => {
   vectorGridLayer = L.vectorGrid.slicer(data, {
     rendererFactory: L.canvas.tile, maxZoom: 22, maxNativeZoom: 14,
     vectorTileLayerStyles: { sliced: p => ({ color: p.impedance > 0.7 ? '#B41E34' : p.impedance > 0.4 ? '#D4AF37' : '#006A4E', weight: 1.5, opacity: 0.6 }) },
@@ -71,7 +71,7 @@ fetch('/streets_stress.geojson').then(res => res.json()).then(data => {
 });
 
 const parksLayer = L.layerGroup().addTo(map);
-fetch('/parks.geojson').then(res => res.json()).then(data => {
+fetch('./parks.geojson').then(res => res.json()).then(data => {
   L.geoJSON(data, {
     style: { fillColor: '#006A4E', color: '#004c38', weight: 1.5, fillOpacity: 0.25 },
     onEachFeature: (f, l) => { if (f.properties.name) l.bindTooltip(`<span style="color:#4ade80;"><b>Park Miejski</b></span><br>${f.properties.name}`); }
@@ -166,7 +166,7 @@ function updateBBoxStats() {
 }
 map.on('moveend', updateBBoxStats);
 
-fetch('/gwr_results.geojson')
+fetch('./gwr_results.geojson')
   .then(res => res.json())
   .then(data => {
     let totalKrkPrice = 0;
@@ -362,7 +362,7 @@ function triggerRouting() {
     const mode = transportModeSelect.value;
     
     showLoading();
-    fetch(`http://localhost:8000/api/route?coords=${coordsStr}&mode=${mode}`)
+    fetch(`https://agh-uhi-geostatistics.onrender.com/api/route?coords=${coordsStr}&mode=${mode}`)
       .then(res => res.json())
       .then(data => {
         if(data.detail) { 
@@ -491,7 +491,7 @@ function executeIsochrone(center) {
   
   L.circleMarker(center, { radius: 6, fillColor: '#8b5cf6', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(isoLayer);
 
-  fetch(`http://localhost:8000/api/isochrone?lat=${center.lat}&lon=${center.lng}&minutes=15&mode=${mode}`)
+  fetch(`https://agh-uhi-geostatistics.onrender.com/api/route?coords=${coordsStr}&mode=${mode}`)
     .then(res => res.json())
     .then(data => {
       if(data.detail) {
